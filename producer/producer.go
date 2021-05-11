@@ -9,7 +9,7 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"strconv"
+
 	"time"
 
 	"github.com/oklog/ulid/v2"
@@ -20,8 +20,8 @@ import (
 )
 
 const (
-	topic         = "message-log"
-	brokerAddress = "localhost:19092"
+	topic         = "messages"
+	brokerAddress = "localhost:9092"
 )
 
 type Message struct {
@@ -36,19 +36,27 @@ type Message struct {
 func test(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	fmt.Fprint(w, "ok")
-	return
+
 }
 
 func publish(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
-
 	reqBody, _ := ioutil.ReadAll(r.Body)
 	msg := Message{Ruta: "Kafka"}
 	json.Unmarshal(reqBody, &msg)
 	data, err := json.Marshal(msg)
+	ctx := context.Background()
+	if err != nil {
+		fmt.Fprintf(w, "ParseForm() err: %v", err)
+		return
+	}
+	produce(ctx, data)
 	// Obtener el mensaje enviado desde la forma
 
-	ctx := context.Background()
+}
+
+func produce(ctx context.Context, data []byte) {
+	// initialize a counter
 
 	l := log.New(os.Stdout, "kafka writer: ", 0)
 	// intialize the writer with the broker addresses, and the topic
@@ -59,9 +67,11 @@ func publish(w http.ResponseWriter, r *http.Request) {
 		Logger: l,
 	})
 
+	// each kafka message has a key and value. The key is used
+	// to decide which partition (and consequently, which broker)
 	// the message gets published on
 	err := w.WriteMessages(ctx, kafka.Message{
-		Key: []byte(strconv.Itoa(i)),
+		Key: []byte(Ulid()),
 		// create an arbitrary message payload for the value
 		Value: []byte(string(data)),
 	})
@@ -69,7 +79,6 @@ func publish(w http.ResponseWriter, r *http.Request) {
 		panic("could not write message " + err.Error())
 	}
 
-	return
 }
 
 func Ulid() string {
@@ -80,13 +89,11 @@ func Ulid() string {
 }
 
 func main() {
-
 	handleRequests()
-
 }
 
 func handleRequests() {
-	port := 5000
+	port := "5500"
 	r := mux.NewRouter().StrictSlash(true)
 
 	r.HandleFunc("/", test).Methods(http.MethodGet)

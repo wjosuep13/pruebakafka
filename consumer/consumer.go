@@ -1,32 +1,40 @@
 package main
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 
 	"github.com/segmentio/kafka-go"
 )
 
 const (
-	topic         = "message-log"
-	brokerAddress = "localhost:19092"
+	topic         = "messages"
+	brokerAddress = "localhost:9092"
 )
 
 type Message struct {
-	Name         string `json:"name"`
-	Location     string `json:"location"`
-	Age          int    `json:"age"`
-	Infectedtype string `json:"infectedtype"`
-	State        string `json:"state"`
-	Ruta         string `json:"ruta"`
+	Name        string `json:"name"`
+	Location    string `json:"location"`
+	Age         int    `json:"age"`
+	Gender      string `json:"gender"`
+	VaccineType string `json:"vaccine_type"`
+	Ruta        string `json:"ruta"`
+}
+
+type Redis struct {
+	DB   string  `json:"db"`
+	Data Message `json:"data"`
 }
 
 func listener() {
 
 	ctx := context.Background()
-
+	host := "http://35.208.191.6:8080/add"
 	l := log.New(os.Stdout, "kafka reader: ", 0)
 	// initialize a new reader with the brokers and topic
 	// the groupID identifies the consumer and prevents
@@ -46,22 +54,23 @@ func listener() {
 		}
 		// after receiving the message, log its value
 		fmt.Println("received: ", string(msg.Value))
+		var jeison Message
+		json.Unmarshal(msg.Value, &jeison)
 
-		resp, err := http.Post(host, "application/json; charset=utf-8", bytes.NewBuffer(msg.Value))
+		redis := Redis{DB: "covid", Data: jeison}
+
+		rbtes, err := json.Marshal(redis)
+
+		resp, err := http.Post(host, "application/json; charset=utf-8", bytes.NewBuffer(rbtes))
 		if err != nil {
 			log.Fatalln(err)
+			fmt.Println("error perrillo")
 			return
 		}
-
 		defer resp.Body.Close()
-		bodyBytes, _ := ioutil.ReadAll(resp.Body)
 
-		// Convert response body to string
-		bodyString := string(bodyBytes)
-		fmt.Println(bodyString)
 	}
 
-	return
 }
 
 func main() {

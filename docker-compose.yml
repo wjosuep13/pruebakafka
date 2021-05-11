@@ -1,0 +1,42 @@
+version: '3.4'
+services:
+  zk1:
+    image: confluentinc/cp-zookeeper:5.3.0
+    ports:
+      - "22181:22181"
+    environment:
+      ZOOKEEPER_SERVER_ID: 1
+      ZOOKEEPER_CLIENT_PORT: 22181
+      ZOOKEEPER_TICK_TIME: 2000
+      ZOOKEEPER_INIT_LIMIT: 5
+      ZOOKEEPER_SYNC_LIMIT: 2
+      ZOOKEEPER_SERVERS: zk1:22888:23888
+
+  
+
+  kafka-1:
+    image: confluentinc/cp-kafka:5.3.0
+    ports:
+      - "19092:19092"
+    depends_on:
+      - zk1
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: ${MY_IP}:22181,
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://${MY_IP}:9092
+
+  producer-kafka:
+    build: ./producer
+    restart: on-failure
+    depends_on:
+      - kafka-1
+    ports:
+        - "5500:5500"
+
+
+  consumer-kafka:
+    build: ./consumer
+    restart: on-failure
+    depends_on:
+      - producer-kafka
+
